@@ -7,9 +7,13 @@ through the `DB_URL` in a Kubernetes Secret.
 
 ```bash
 brew install kind helm          # kubectl comes with Docker Desktop
-deploy/scripts/kind-up.sh       # cluster + ingress-nginx + metrics-server
-deploy/scripts/create-secret.sh .env.neon   # DB_URL, JWT_SECRET, GOOGLE_CLIENT_ID (+ DB_USERNAME/DB_PASSWORD)
+deploy/scripts/kind-up.sh       # cluster + ingress-nginx + metrics-server; makes `interview` the default namespace
+deploy/scripts/monitoring-up.sh # Prometheus, Alertmanager, Grafana and Tempo in the `monitoring` namespace
+deploy/scripts/create-secret.sh .env.neon   # DB_URL, JWT_SECRET (32+ chars), GOOGLE_CLIENT_ID (+ DB_USERNAME/DB_PASSWORD)
 ```
+
+The app runs in its own `interview` namespace, which enforces the Pod Security `restricted` profile and is protected
+by a NetworkPolicy (only the Ingress controller reaches the API, only Prometheus reaches the actuator).
 
 `.env.neon` is gitignored. The chart never creates the Secret, so credentials are not in git or in Helm history.
 
@@ -52,6 +56,23 @@ deploy/scripts/drift-check.sh     # exit 1 if pods differ from the release, or l
 Hand edits (`kubectl set ...`, `kubectl edit`) show up as drift. Helm applies server-side, so a plain
 `helm upgrade` refuses to overwrite a hand-edited field and reports a conflict. To deliberately reset the
 cluster to what Git says, add `--force-conflicts`.
+
+## Observe
+
+```bash
+kubectl -n monitoring port-forward svc/monitoring-grafana 3000:80        # dashboard: "Interview Monolith: service health"
+kubectl -n monitoring get secret grafana-admin -o jsonpath='{.data.admin-password}' | base64 -d   # the admin password
+kubectl -n monitoring port-forward svc/monitoring-prometheus 9090        # alerts at http://localhost:9090/alerts
+deploy/scripts/traffic.sh 300 3                                          # synthetic authenticated traffic (needs the seeded demo users)
+```
+
+What each alert means and what to do about it is in [`docs/runbook.md`](../docs/runbook.md).
+
+## Prove it works
+
+```bash
+deploy/scripts/evidence.sh        # commit -> image -> release -> pods -> user journey -> metrics and traces
+```
 
 ## CI/CD in GitHub Actions
 
