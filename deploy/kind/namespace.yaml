@@ -1,0 +1,9 @@
+# The app gets its own namespace. Pod Security Admission rejects any pod here that is not "restricted":
+# must run as non-root, drop all capabilities, forbid privilege escalation, use the runtime seccomp profile.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: interview
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest

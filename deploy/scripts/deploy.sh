@@ -5,13 +5,15 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
-NAMESPACE=${1:-default}
+NAMESPACE=${1:-interview}
 SHA=$(git rev-parse HEAD)
 IMAGE=interview-monolith
 
 if [ -n "$(git status --porcelain)" ]; then
   echo "warning: working tree is dirty; the deployed revision label ($SHA) will not describe the exact code" >&2
 fi
+
+kubectl apply -f deploy/kind/namespace.yaml
 
 DOCKER_BUILDKIT=1 docker build --build-arg GIT_SHA="$SHA" -t "$IMAGE:$SHA" .
 kind load docker-image "$IMAGE:$SHA" --name interview

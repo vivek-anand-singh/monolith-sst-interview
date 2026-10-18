@@ -64,3 +64,10 @@ tracing:
   enabled: false
   endpoint: http://tempo.monitoring.svc:4318/v1/traces
   samplingProbability: "1.0"
+
+# Only the Ingress controller may reach the API, only Prometheus the management port, and the pods may only talk
+# out to DNS, the tracing backend, and the database / Google over TLS. Needs a CNI that enforces NetworkPolicy.
+networkPolicy:
+  enabled: true
+  # Egress TCP ports allowed to any address: 5432 = PostgreSQL (Neon), 443 = Google's token verification.
+  externalEgressPorts: [5432, 443]

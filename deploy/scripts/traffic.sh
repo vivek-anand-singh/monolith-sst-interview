@@ -9,7 +9,7 @@ DURATION=${1:-300}
 WORKERS=${2:-3}
 URL=${URL:-http://interview.localtest.me:8080}
 
-JWT_SECRET=$(kubectl get secret interview-monolith-secrets -o jsonpath='{.data.JWT_SECRET}' | base64 -d)
+JWT_SECRET=$(kubectl -n "${NAMESPACE:-interview}" get secret interview-monolith-secrets -o jsonpath='{.data.JWT_SECRET}' | base64 -d)
 b64url() { openssl base64 -e -A | tr '+' '-' | tr '/' '_' | tr -d '='; }
 token_for() {
   local header payload now signature

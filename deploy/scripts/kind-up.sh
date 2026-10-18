@@ -14,5 +14,9 @@ kubectl apply -f "https://github.com/kubernetes-sigs/metrics-server/releases/dow
 kubectl -n kube-system patch deployment metrics-server --type=json \
   -p '[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
 
+kubectl apply -f kind/namespace.yaml
+# Make plain kubectl commands (and the runbook) target the app namespace.
+kubectl config set-context --current --namespace=interview >/dev/null
+
 kubectl -n ingress-nginx rollout status deployment/ingress-nginx-controller --timeout=180s
 kubectl -n kube-system rollout status deployment/metrics-server --timeout=120s

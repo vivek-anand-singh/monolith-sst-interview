@@ -44,10 +44,12 @@ jobs:
           cluster_name: release
       - run: kind load docker-image "${IMAGE}:${SHA}" --name release
 
-      - run: kubectl apply -f deploy/ci/postgres.yaml && kubectl rollout status deploy/smoke-postgres --timeout=120s
+      # Same namespace, with the same Pod Security "restricted" enforcement, as the real deployment.
+      - run: kubectl apply -f deploy/kind/namespace.yaml
+      - run: kubectl -n interview apply -f deploy/ci/postgres.yaml && kubectl -n interview rollout status deploy/smoke-postgres --timeout=120s
       - name: Create the application secret
         run: |
-          kubectl create secret generic interview-monolith-secrets \
+          kubectl -n interview create secret generic interview-monolith-secrets \
             --from-literal=DB_URL=jdbc:postgresql://smoke-postgres:5432/interview \
             --from-literal=DB_USERNAME=smoke \
             --from-literal=DB_PASSWORD=smoke \
@@ -56,7 +58,7 @@ jobs:
 
       - name: Deploy (rolls back automatically if the pods never become ready)
         run: >
-          helm upgrade --install interview deploy/helm/interview-monolith
+          helm upgrade --install interview deploy/helm/interview-monolith --namespace interview
           --set image.repository="${IMAGE}" --set image.tag="${SHA}"
           --set ingress.enabled=false --set autoscaling.enabled=false
           --atomic --wait --timeout 5m

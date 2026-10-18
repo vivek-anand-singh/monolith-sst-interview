@@ -1,4 +1,5 @@
 # Throwaway PostgreSQL for the CD smoke test only. Credentials are not secret: the cluster lives for one workflow run.
+# It runs in the "interview" namespace, so it must satisfy the same Pod Security "restricted" profile as the app.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -13,6 +14,14 @@ spec:
       labels:
         app: smoke-postgres
     spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: postgres
           image: postgres:16
@@ -26,6 +35,22 @@ spec:
             exec:
               command: ["pg_isready", "-U", "smoke", "-d", "interview"]
             periodSeconds: 3
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/postgresql/data }
+            - { name: run, mountPath: /var/run/postgresql }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - { name: data, emptyDir: {} }
+        - { name: run, emptyDir: {} }
+        - { name: tmp, emptyDir: {} }
 ---
 apiVersion: v1
 kind: Service

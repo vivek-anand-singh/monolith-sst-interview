@@ -4,7 +4,7 @@
 set -euo pipefail
 
 EXPECTED_SHA=${1:?usage: smoke-test.sh <expected-commit-sha> [namespace] [deployment]}
-NAMESPACE=${2:-default}
+NAMESPACE=${2:-interview}
 DEPLOYMENT=${3:-interview-monolith}
 API_PORT=18000
 MANAGEMENT_PORT=18081

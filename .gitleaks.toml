@@ -1,0 +1,8 @@
+# Default gitleaks rules plus one narrow exception.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Placeholder signing secrets that only exist inside tests"
+paths = ['''src/test/java/.*''']
+regexes = ['''(integration|unit)-test-secret[-a-z0-9]*''']

@@ -4,7 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
-NAMESPACE=${1:-default}
+NAMESPACE=${1:-interview}
 CHART=deploy/helm/interview-monolith
 drift=0
 
