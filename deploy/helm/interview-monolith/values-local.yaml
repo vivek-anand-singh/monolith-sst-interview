@@ -1,0 +1,9 @@
+# kind demo: the image is loaded into the cluster with `kind load docker-image`, never pulled.
+image:
+  repository: interview-monolith
+  pullPolicy: Never
+
+replicaCount: 2
+
+ingress:
+  host: interview.localtest.me

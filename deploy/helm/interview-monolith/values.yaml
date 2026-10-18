@@ -1,0 +1,48 @@
+# Defaults are safe for any cluster; values-local.yaml only adds what is specific to the kind demo.
+
+image:
+  repository: ghcr.io/vivek-anand-singh/monolith-sst-interview
+  # The commit SHA the image was built from. Always set by the pipeline (--set image.tag=<sha>); there is no "latest".
+  tag: ""
+  pullPolicy: IfNotPresent
+
+replicaCount: 2
+
+# Name of a Secret holding DB_URL, JWT_SECRET and GOOGLE_CLIENT_ID (optionally DB_USERNAME / DB_PASSWORD).
+# The chart never creates it, so credentials stay out of git and out of Helm release history.
+existingSecret: interview-monolith-secrets
+
+config:
+  corsAllowedOrigins: "http://localhost:3000"
+
+service:
+  port: 80
+
+ingress:
+  enabled: true
+  className: nginx
+  host: interview.localtest.me
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 768Mi
+
+# Zero-downtime rollout: a new pod must be Ready before an old one is removed.
+strategy:
+  maxSurge: 1
+  maxUnavailable: 0
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 4
+  targetCPUUtilizationPercentage: 70
+
+podDisruptionBudget:
+  minAvailable: 1
+
+terminationGracePeriodSeconds: 40
