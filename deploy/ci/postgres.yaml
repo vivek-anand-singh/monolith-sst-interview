@@ -29,6 +29,8 @@ spec:
             - { name: POSTGRES_DB, value: interview }
             - { name: POSTGRES_USER, value: smoke }
             - { name: POSTGRES_PASSWORD, value: smoke }
+            # initdb cannot chmod the volume's root (owned by root); it can create and own a subdirectory.
+            - { name: PGDATA, value: /var/lib/postgresql/data/pgdata }
           ports:
             - containerPort: 5432
           readinessProbe:
