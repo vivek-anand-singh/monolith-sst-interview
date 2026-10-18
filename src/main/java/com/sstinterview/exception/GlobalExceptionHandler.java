@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.Map;
 
@@ -52,6 +53,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(GoogleTokenVerificationException.class)
     public ResponseEntity<Map<String, String>> handleGoogleTokenVerification(GoogleTokenVerificationException ex) {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of("error", "Unable to verify Google token, please try again"));
+    }
+
+    // Unknown paths are a client mistake; without this they fall through to the 500 handler and inflate the error rate.
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<Map<String, String>> handleNoResource(NoResourceFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Not found"));
     }
 
     @ExceptionHandler(Exception.class)

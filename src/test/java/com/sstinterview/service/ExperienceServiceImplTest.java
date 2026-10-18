@@ -17,6 +17,7 @@ import com.sstinterview.repository.FlagRepository;
 import com.sstinterview.repository.ReplyRepository;
 import com.sstinterview.repository.RoundTypeRepository;
 import com.sstinterview.repository.TagRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -50,6 +51,7 @@ class ExperienceServiceImplTest
     @Mock private UserService userService;
     @Mock private NotificationService notificationService;
 
+    private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
     private ExperienceServiceImpl service;
 
     private final UUID ownerId = UUID.randomUUID();
@@ -60,7 +62,7 @@ class ExperienceServiceImplTest
     {
         service = new ExperienceServiceImpl(experienceRepository, reviewRepository, questionRepository,
                 companyRepository, roundTypeRepository, tagRepository, commentRepository, flagRepository,
-                replyRepository, userService, notificationService);
+                replyRepository, userService, notificationService, meterRegistry);
     }
 
     private Experience experienceWithStatus(ExperienceStatus status)
@@ -124,6 +126,7 @@ class ExperienceServiceImplTest
 
         assertEquals(ExperienceStatus.PENDING, response.getStatus());
         verify(notificationService).notifyExperienceSubmitted(experienceId, "Acme");
+        assertEquals(1.0, meterRegistry.counter("interview.experiences.submitted").count());
     }
 
     @Test
@@ -146,6 +149,7 @@ class ExperienceServiceImplTest
         service.reviewExperience(UUID.randomUUID(), "Admin", experienceId, review(ExperienceStatus.APPROVED, null));
 
         assertEquals(ExperienceStatus.APPROVED, experience.getStatus());
+        assertEquals(1.0, meterRegistry.counter("interview.experiences.reviewed", "status", "APPROVED").count());
         verify(notificationService).notifyExperienceReviewed(eq(experienceId), eq(ownerId),
                 eq(ExperienceStatus.APPROVED), any(), eq("Acme"));
     }

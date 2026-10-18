@@ -31,6 +31,7 @@ import com.sstinterview.repository.FlagRepository;
 import com.sstinterview.repository.ReplyRepository;
 import com.sstinterview.repository.RoundTypeRepository;
 import com.sstinterview.repository.TagRepository;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
@@ -60,6 +61,7 @@ public class ExperienceServiceImpl implements ExperienceService
     private final ReplyRepository replyRepository;
     private final UserService userService;
     private final NotificationService notificationService;
+    private final MeterRegistry meterRegistry;
 
     public ExperienceServiceImpl(ExperienceRepository experienceRepository,
                                   ExperienceReviewRepository reviewRepository,
@@ -71,7 +73,8 @@ public class ExperienceServiceImpl implements ExperienceService
                                   FlagRepository flagRepository,
                                   ReplyRepository replyRepository,
                                   UserService userService,
-                                  NotificationService notificationService)
+                                  NotificationService notificationService,
+                                  MeterRegistry meterRegistry)
     {
         this.experienceRepository = experienceRepository;
         this.reviewRepository = reviewRepository;
@@ -84,6 +87,7 @@ public class ExperienceServiceImpl implements ExperienceService
         this.replyRepository = replyRepository;
         this.userService = userService;
         this.notificationService = notificationService;
+        this.meterRegistry = meterRegistry;
     }
 
     /**
@@ -246,6 +250,7 @@ public class ExperienceServiceImpl implements ExperienceService
         Experience saved = experienceRepository.save(experience);
         List<String> questions = insertQuestions(saved, dto.getQuestions());
 
+        meterRegistry.counter("interview.experiences.submitted").increment();
         notificationService.notifyExperienceSubmitted(saved.getId(), company.getName());
 
         return ExperienceResponseDto.from(saved, userService.getAuthorName(userId), 0L, questions);
@@ -319,6 +324,8 @@ public class ExperienceServiceImpl implements ExperienceService
 
         experience.setStatus(dto.getStatus());
         experienceRepository.save(experience);
+
+        meterRegistry.counter("interview.experiences.reviewed", "status", dto.getStatus().name()).increment();
 
         notificationService.notifyExperienceReviewed(experience.getId(), experience.getUserId(), dto.getStatus(), dto.getFeedback(), experience.getCompany().getName());
 

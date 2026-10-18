@@ -11,6 +11,7 @@ import com.sstinterview.repository.UserRepository;
 import com.sstinterview.service.JwtService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -24,9 +25,15 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -37,9 +44,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * then shows up in the public listing.
  */
 @Testcontainers
-@SpringBootTest(properties = {
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
         "jwt.secret=integration-test-secret-that-is-at-least-32-bytes",
-        "google.client-id=integration-test-client-id"
+        "google.client-id=integration-test-client-id",
+        "management.server.port=0",
+        "GIT_SHA=test-revision"
 })
 @AutoConfigureMockMvc
 class ExperienceJourneyIntegrationTest
@@ -55,6 +64,8 @@ class ExperienceJourneyIntegrationTest
     @Autowired private CompanyRepository companyRepository;
     @Autowired private RoundTypeRepository roundTypeRepository;
     @Autowired private JdbcTemplate jdbcTemplate;
+    @Value("${local.management.port}") private int managementPort;
+    @Value("${local.server.port}") private int serverPort;
 
     private User createUser(Role role)
     {
@@ -81,16 +92,63 @@ class ExperienceJourneyIntegrationTest
         assertEquals(8, applied);
     }
 
-    @Test
-    void healthEndpointIsPublic() throws Exception
+    private HttpResponse<String> getFromManagementPort(String path) throws Exception
     {
-        mockMvc.perform(get("/actuator/health")).andExpect(status().isOk());
+        HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + managementPort + path)).build();
+        return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+    }
+
+    @Test
+    void healthEndpointReportsLivenessAndReadinessWithoutAToken() throws Exception
+    {
+        HttpResponse<String> response = getFromManagementPort("/actuator/health");
+
+        assertEquals(200, response.statusCode());
+        assertTrue(response.body().contains("\"readiness\""));
+    }
+
+    @Test
+    void infoEndpointReportsTheRunningRevision() throws Exception
+    {
+        HttpResponse<String> response = getFromManagementPort("/actuator/info");
+
+        assertEquals(200, response.statusCode());
+        assertTrue(response.body().contains("test-revision"));
+    }
+
+    @Test
+    void prometheusEndpointExposesHttpMetricsAndBusinessCounters() throws Exception
+    {
+        mockMvc.perform(get("/experiences")).andExpect(status().isUnauthorized());
+
+        HttpResponse<String> response = getFromManagementPort("/actuator/prometheus");
+
+        assertEquals(200, response.statusCode());
+        assertTrue(response.body().contains("http_server_requests_seconds_bucket"));
+        assertTrue(response.body().contains("application=\"interview-backend\""));
+    }
+
+    @Test
+    void actuatorIsNotReachableOnThePublicPort() throws Exception
+    {
+        HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + serverPort + "/actuator/prometheus")).build();
+
+        HttpResponse<String> response = HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+
+        assertNotEquals(200, response.statusCode());
     }
 
     @Test
     void protectedEndpointRejectsRequestsWithoutAToken() throws Exception
     {
         mockMvc.perform(get("/experiences")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void unknownPathIsANotFoundNotAServerError() throws Exception
+    {
+        mockMvc.perform(get("/no-such-path").header("Authorization", bearer(createUser(Role.USER))))
+                .andExpect(status().isNotFound());
     }
 
     @Test
