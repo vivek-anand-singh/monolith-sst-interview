@@ -18,16 +18,16 @@ How to look:
 ```bash
 kubectl -n monitoring port-forward svc/monitoring-grafana 3000:80          # dashboard "Interview Monolith: service health"
 kubectl -n monitoring port-forward svc/monitoring-prometheus 9090          # alerts: http://localhost:9090/alerts
-kubectl logs deploy/interview-monolith | grep '"log.level":"ERROR"'       # JSON logs; each line has trace.id
+kubectl logs deploy/interview-monolith | grep '"level":"ERROR"'       # JSON logs; each request line has traceId
 ```
 
-To follow one failing request: take the `trace.id` from the error log line and open it in Grafana > Explore > Tempo.
+To follow one failing request: take the `traceId` from the error log line and open it in Grafana > Explore > Tempo.
 
 ## Alerts
 
 ### InterviewErrorBudgetFastBurn
 **Meaning:** 5xx rate is above 7.2% in both the last 5 minutes and the last hour, which would spend the 30-day budget in about two days. Page.
-**Check:** *Requests by status* (which status), error logs with `trace.id`, `helm history interview` (did a release just go out?), *DB connection timeouts*.
+**Check:** *Requests by status* (which status), error logs with `traceId`, `helm history interview` (did a release just go out?), *DB connection timeouts*.
 **Act:**
 - Started right after a release: `deploy/scripts/rollback.sh`.
 - Database errors or pool timeouts: see InterviewDbConnectionTimeouts.

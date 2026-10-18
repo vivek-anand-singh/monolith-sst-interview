@@ -35,6 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -160,6 +161,20 @@ class ExperienceJourneyIntegrationTest
     {
         mockMvc.perform(get("/no-such-path").header("Authorization", bearer(createUser(Role.USER))))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void malformedInputIsABadRequestNotAServerError() throws Exception
+    {
+        String token = bearer(createUser(Role.USER));
+
+        mockMvc.perform(get("/experiences/not-a-uuid").header("Authorization", token))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(post("/experiences").header("Authorization", token)
+                        .contentType(MediaType.APPLICATION_JSON).content("{not json"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(delete("/auth/me").header("Authorization", token))
+                .andExpect(status().isMethodNotAllowed());
     }
 
     @Test
