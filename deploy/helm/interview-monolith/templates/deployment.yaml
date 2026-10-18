@@ -56,6 +56,10 @@ spec:
                 name: {{ include "interview-monolith.name" . }}
             - secretRef:
                 name: {{ .Values.existingSecret }}
+          {{- with .Values.extraEnv }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           securityContext:

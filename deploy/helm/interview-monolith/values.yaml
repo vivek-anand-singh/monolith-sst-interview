@@ -15,6 +15,9 @@ existingSecret: interview-monolith-secrets
 config:
   corsAllowedOrigins: "http://localhost:3000"
 
+# Extra environment variables for the container, e.g. feature toggles. Rendered as a standard env list.
+extraEnv: []
+
 service:
   port: 80
 
