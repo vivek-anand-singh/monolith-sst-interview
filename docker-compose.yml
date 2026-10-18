@@ -21,6 +21,8 @@ services:
     build:
       context: .
       network: host
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
     ports:
       - "8000:8000"
     env_file:
@@ -36,7 +38,8 @@ services:
       - 8.8.8.8
       - 8.8.4.4
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/actuator/health || exit 1"]
+      # The image has no curl; probe the health endpoint over a raw TCP connection instead.
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/8000 && printf 'GET /actuator/health HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q '\"status\":\"UP\"' <&3"]
       interval: 15s
       timeout: 5s
       retries: 5

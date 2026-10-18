@@ -1,0 +1,13 @@
+.git
+.idea
+.mvn/wrapper/maven-wrapper.jar
+target
+.env
+.env.*
+!.env.example
+*.md
+db
+deploy.sh
+docker-compose.yml
+Dockerfile
+.dockerignore
