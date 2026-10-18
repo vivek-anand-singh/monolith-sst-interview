@@ -1,0 +1,47 @@
+services:
+
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: interview
+      POSTGRES_USER: ${DB_USERNAME:-interviewuser}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "127.0.0.1:${DB_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-interviewuser} -d interview"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+      network: host
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/interview
+    depends_on:
+      db:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    restart: unless-stopped
+
+volumes:
+  pgdata:
