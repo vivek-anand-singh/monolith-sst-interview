@@ -10,7 +10,7 @@ RUN --mount=type=cache,target=/root/.m2 mvn -B -q clean package -DskipTests
 # Split the fat jar into layers so a code-only change does not re-ship the dependencies.
 RUN java -Djarmode=tools -jar target/*.jar extract --layers --launcher --destination /app/layers
 
-FROM eclipse-temurin:17-jre
+FROM eclipse-temurin:17-jre-jammy
 RUN groupadd --system --gid 10001 app && useradd --system --uid 10001 --gid app --no-create-home app
 WORKDIR /app
 COPY --from=build --chown=app:app /app/layers/dependencies/ ./
