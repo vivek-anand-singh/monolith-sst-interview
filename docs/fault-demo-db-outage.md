@@ -17,9 +17,9 @@ then the error-budget burn alerts. Recovery should need no restart, because the 
 
 | Time | What was observed |
 |---|---|
+| about +15 s | the HPA, reacting to the traffic ramp, scaled from 2 to 4 pods; the 2 new pods could not start (Flyway needs the database at boot) and went into CrashLoop; `InterviewReplicasUnavailable` went pending at +40 s |
 | +100 s | `InterviewDbConnectionTimeouts` **firing** (page): requests were timing out waiting for a pooled connection |
 | +161 s | `InterviewErrorBudgetSlowBurn` pending; 5xx ratio (5 min) 10.6% |
-| +221 s | the HPA, reacting to load, had scaled from 2 to 4 pods; the 2 new pods could not start (Flyway needs the database at boot) and went into CrashLoop |
 | +342 s | `InterviewReplicasUnavailable` **firing**: it reported exactly that |
 | +362 s | `InterviewErrorBudgetFastBurn` **firing** (page): 5xx ratio 100% over 5 min and 12.3% over 1 h, both above the 7.2% threshold |
 
