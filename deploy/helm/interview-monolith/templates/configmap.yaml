@@ -6,6 +6,7 @@ metadata:
     {{- include "interview-monolith.labels" . | nindent 4 }}
 data:
   CORS_ALLOWED_ORIGINS: {{ .Values.config.corsAllowedOrigins | quote }}
+  DB_CONNECTION_TIMEOUT_MS: {{ .Values.config.dbConnectionTimeoutMs | quote }}
   {{- if .Values.tracing.enabled }}
   MANAGEMENT_TRACING_EXPORT_OTLP_ENABLED: "true"
   MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT: {{ .Values.tracing.endpoint | quote }}

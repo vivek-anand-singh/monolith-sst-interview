@@ -27,6 +27,8 @@ COMPANY=$(curl -sf -H "Authorization: Bearer $ALICE" "$URL/companies?size=1" | f
 ROUND=$(curl -sf -H "Authorization: Bearer $ALICE" "$URL/round-types" | first_id)
 
 worker() {
+  # A timed-out or failed request is expected during an outage; it must not end the worker.
+  set +e
   local end=$((SECONDS + DURATION)) n=0 id
   while [ $SECONDS -lt $end ]; do
     curl -s -o /dev/null -m 70 -H "Authorization: Bearer $ALICE" "$URL/experiences?page=0&size=10"
