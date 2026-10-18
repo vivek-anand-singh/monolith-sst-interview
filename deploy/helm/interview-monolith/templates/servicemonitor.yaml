@@ -1,0 +1,17 @@
+{{- if .Values.monitoring.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "interview-monolith.name" . }}
+  labels:
+    {{- include "interview-monolith.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "interview-monolith.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: metrics
+  endpoints:
+    - port: management
+      path: /actuator/prometheus
+      interval: 15s
+{{- end }}

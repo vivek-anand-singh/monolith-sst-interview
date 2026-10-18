@@ -1,0 +1,13 @@
+{{- if .Values.monitoring.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "interview-monolith.name" . }}-dashboard
+  labels:
+    {{- include "interview-monolith.labels" . | nindent 4 }}
+    # The Grafana sidecar loads every ConfigMap carrying this label.
+    grafana_dashboard: "1"
+data:
+  interview-monolith.json: |-
+    {{- .Files.Get "files/dashboard.json" | nindent 4 }}
+{{- end }}

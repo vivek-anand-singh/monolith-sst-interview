@@ -1,0 +1,52 @@
+# Sized for a laptop kind cluster. Metrics, alert rules and Grafana only; logs stay on stdout (JSON).
+fullnameOverride: monitoring
+
+# kind's control-plane components are not scrapeable the usual way and add noise.
+kubeEtcd: { enabled: false }
+kubeControllerManager: { enabled: false }
+kubeScheduler: { enabled: false }
+kubeProxy: { enabled: false }
+nodeExporter: { enabled: false }
+
+prometheus:
+  prometheusSpec:
+    retention: 2d
+    # Pick up ServiceMonitors and PrometheusRules from any namespace, not only those labelled for this release.
+    serviceMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    resources:
+      requests: { cpu: 100m, memory: 400Mi }
+      limits: { memory: 800Mi }
+
+alertmanager:
+  alertmanagerSpec:
+    resources:
+      requests: { cpu: 10m, memory: 50Mi }
+      limits: { memory: 100Mi }
+
+kube-state-metrics:
+  # Exposes the version label of each pod so the dashboard can show which commit is running.
+  metricLabelsAllowlist:
+    - pods=[app.kubernetes.io/version]
+
+grafana:
+  admin:
+    # Created by monitoring-up.sh with a random password, so no credential is committed.
+    existingSecret: grafana-admin
+    userKey: admin-user
+    passwordKey: admin-password
+  resources:
+    requests: { cpu: 50m, memory: 150Mi }
+    limits: { memory: 300Mi }
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      searchNamespace: ALL
+  additionalDataSources:
+    - name: Tempo
+      uid: tempo
+      type: tempo
+      access: proxy
+      url: http://tempo.monitoring.svc:3200

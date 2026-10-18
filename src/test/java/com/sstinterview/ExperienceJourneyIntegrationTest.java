@@ -32,6 +32,7 @@ import java.net.http.HttpResponse;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -126,6 +127,16 @@ class ExperienceJourneyIntegrationTest
         assertEquals(200, response.statusCode());
         assertTrue(response.body().contains("http_server_requests_seconds_bucket"));
         assertTrue(response.body().contains("application=\"interview-backend\""));
+    }
+
+    @Test
+    void probeAndScrapeTrafficStaysOutOfTheRequestMetrics() throws Exception
+    {
+        getFromManagementPort("/actuator/info");
+
+        HttpResponse<String> response = getFromManagementPort("/actuator/prometheus");
+
+        assertFalse(response.body().contains("uri=\"/actuator"));
     }
 
     @Test

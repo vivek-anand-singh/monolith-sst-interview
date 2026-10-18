@@ -116,6 +116,11 @@
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-registry-prometheus</artifactId>
         </dependency>
+        <!-- Distributed tracing: spans via the Micrometer-to-OpenTelemetry bridge, exported over OTLP. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-opentelemetry</artifactId>
+        </dependency>
         <!-- Swagger / OpenAPI -->
         <dependency>
             <groupId>org.springdoc</groupId>

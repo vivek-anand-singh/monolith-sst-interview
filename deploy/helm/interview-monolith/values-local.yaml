@@ -7,3 +7,9 @@ replicaCount: 2
 
 ingress:
   host: interview.localtest.me
+
+monitoring:
+  enabled: true
+
+tracing:
+  enabled: true
