@@ -1,0 +1,38 @@
+# Throwaway PostgreSQL for the CD smoke test only. Credentials are not secret: the cluster lives for one workflow run.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: smoke-postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: smoke-postgres
+  template:
+    metadata:
+      labels:
+        app: smoke-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16
+          env:
+            - { name: POSTGRES_DB, value: interview }
+            - { name: POSTGRES_USER, value: smoke }
+            - { name: POSTGRES_PASSWORD, value: smoke }
+          ports:
+            - containerPort: 5432
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "smoke", "-d", "interview"]
+            periodSeconds: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: smoke-postgres
+spec:
+  selector:
+    app: smoke-postgres
+  ports:
+    - port: 5432
