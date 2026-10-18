@@ -1,0 +1,10 @@
+# Single-binary Tempo receiving OTLP from the app. Traces live in memory/emptyDir for 24h: enough for a demo.
+tempo:
+  reportingEnabled: false
+  memBallastSizeMbs: 128
+  retention: 24h
+  resources:
+    requests: { cpu: 50m, memory: 200Mi }
+    limits: { memory: 400Mi }
+persistence:
+  enabled: false

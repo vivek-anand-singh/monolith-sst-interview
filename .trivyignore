@@ -1,0 +1,2 @@
+# False positive: the value is a number of milliseconds; Trivy matches the "DB_" prefix of the key name.
+KSV-01010

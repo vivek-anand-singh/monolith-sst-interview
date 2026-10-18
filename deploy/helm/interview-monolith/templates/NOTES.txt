@@ -1,0 +1,4 @@
+Deployed {{ include "interview-monolith.name" . }} at revision {{ .Values.image.tag }}.
+
+  http://{{ .Values.ingress.host }}:8080/        (kind demo port mapping)
+  Running version:  kubectl port-forward deploy/{{ include "interview-monolith.name" . }} 8081 && curl localhost:8081/actuator/info

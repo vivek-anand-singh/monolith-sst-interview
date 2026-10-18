@@ -1,0 +1,123 @@
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, 'devops/**']
+  workflow_dispatch:
+
+# Least privilege by default; the image job adds packages: write for itself only.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      # Includes the Testcontainers integration test, which starts a real PostgreSQL 16 through the runner's Docker.
+      - run: ./mvnw -B verify
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-reports
+          path: target/surefire-reports
+
+  chart:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - run: helm lint deploy/helm/interview-monolith --set image.tag=ci
+      - run: >
+          helm template interview deploy/helm/interview-monolith
+          -f deploy/helm/interview-monolith/values-local.yaml --set image.tag=ci > /dev/null
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # gitleaks reads the whole history, not just the tip
+
+      # Secrets: fails on any credential in any commit (rules in .gitleaks.toml).
+      - run: docker run --rm -v "$PWD":/repo zricethezav/gitleaks:v8.30.1 detect --source /repo --config /repo/.gitleaks.toml --no-banner --redact
+
+      # Misconfiguration: the Dockerfile, the CI manifests and the rendered Helm chart (security contexts, namespaces, ...).
+      - name: Render the chart
+        run: >
+          mkdir rendered && helm template interview deploy/helm/interview-monolith
+          --namespace interview -f deploy/helm/interview-monolith/values-local.yaml --set image.tag=ci > rendered/chart.yaml
+      - run: >
+          docker run --rm -v "$PWD":/work -w /work aquasec/trivy:0.76.0 config
+          --severity MEDIUM,HIGH,CRITICAL --exit-code 1 --ignorefile .trivyignore
+          --skip-dirs deploy/helm .
+
+  image:
+    needs: [test, chart, security]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      # Build once into the local Docker daemon so the exact bytes that get scanned are the bytes that get pushed.
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: ${{ env.IMAGE }}:${{ github.sha }}
+          build-args: GIT_SHA=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Fails the pipeline on any fixable HIGH or CRITICAL vulnerability in the OS packages or Java dependencies.
+      - uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ env.IMAGE }}:${{ github.sha }}
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+      # Only pushes (never pull requests) publish an image, tagged with the commit SHA it was built from.
+      - uses: docker/login-action@v3
+        if: github.event_name == 'push'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        id: push
+        if: github.event_name == 'push'
+        with:
+          context: .
+          push: true
+          tags: ${{ env.IMAGE }}:${{ github.sha }}
+          build-args: GIT_SHA=${{ github.sha }}
+          cache-from: type=gha
+
+      - name: Summary
+        if: github.event_name == 'push'
+        run: |
+          {
+            echo "### Image published"
+            echo "- Image: \`${IMAGE}:${GITHUB_SHA}\`"
+            echo "- Digest: \`${{ steps.push.outputs.digest }}\`"
+            echo "- Commit: ${GITHUB_SHA}"
+          } >> "$GITHUB_STEP_SUMMARY"

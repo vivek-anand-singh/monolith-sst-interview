@@ -1,0 +1,73 @@
+# Defaults are safe for any cluster; values-local.yaml only adds what is specific to the kind demo.
+
+image:
+  repository: ghcr.io/vivek-anand-singh/monolith-sst-interview
+  # The commit SHA the image was built from. Always set by the pipeline (--set image.tag=<sha>); there is no "latest".
+  tag: ""
+  pullPolicy: IfNotPresent
+
+replicaCount: 2
+
+# Name of a Secret holding DB_URL, JWT_SECRET and GOOGLE_CLIENT_ID (optionally DB_USERNAME / DB_PASSWORD).
+# The chart never creates it, so credentials stay out of git and out of Helm release history.
+existingSecret: interview-monolith-secrets
+
+config:
+  corsAllowedOrigins: "http://localhost:3000"
+  # Fail fast when the database is unreachable (see application.properties).
+  dbConnectionTimeoutMs: 10000
+
+# Extra environment variables for the container, e.g. feature toggles. Rendered as a standard env list.
+extraEnv: []
+
+service:
+  port: 80
+
+ingress:
+  enabled: true
+  className: nginx
+  host: interview.localtest.me
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 768Mi
+
+# Zero-downtime rollout: a new pod must be Ready before an old one is removed.
+strategy:
+  maxSurge: 1
+  maxUnavailable: 0
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 4
+  targetCPUUtilizationPercentage: 70
+
+podDisruptionBudget:
+  minAvailable: 1
+
+terminationGracePeriodSeconds: 40
+
+# Needs the Prometheus Operator CRDs (installed by deploy/scripts/monitoring-up.sh).
+monitoring:
+  enabled: false
+  # Reliability targets the alerts and the dashboard are written against.
+  availabilitySlo: 0.995     # share of requests that must not be 5xx
+  latencySlo: 0.95           # share of requests that must finish within 500 ms
+
+# Export traces over OTLP/HTTP. Trace ids appear in the JSON logs either way.
+tracing:
+  enabled: false
+  endpoint: http://tempo.monitoring.svc:4318/v1/traces
+  samplingProbability: "1.0"
+
+# Only the Ingress controller may reach the API, only Prometheus the management port, and the pods may only talk
+# out to DNS, the tracing backend, and the database / Google over TLS. Needs a CNI that enforces NetworkPolicy.
+networkPolicy:
+  enabled: true
+  # Egress TCP ports allowed to any address: 5432 = PostgreSQL (Neon), 443 = Google's token verification.
+  externalEgressPorts: [5432, 443]

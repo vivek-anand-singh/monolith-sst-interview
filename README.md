@@ -4,6 +4,32 @@ One Spring Boot app (Java 17, port **8000**) that replaces the four microservice
 `sst-interview-backend` (API Gateway, User, Content, Notification). The REST API is identical
 (same 41 endpoints), so the frontend works as before.
 
+## DevOps: Kubernetes, CI/CD, observability, security
+
+This repository is also the Advanced DevOps course project. The application code is unchanged in behaviour; what
+was added around it:
+
+| | |
+|---|---|
+| Baseline and scope | [`BASELINE.md`](BASELINE.md) |
+| Run it on Kubernetes (kind), release, roll back, check drift | [`deploy/README.md`](deploy/README.md) |
+| Architecture and failure boundaries | [`docs/architecture.md`](docs/architecture.md) |
+| Why each choice, and what would change | [`docs/decisions.md`](docs/decisions.md) |
+| What healthy means, and what to do per alert | [`docs/runbook.md`](docs/runbook.md) |
+| Database outage fault demonstration | [`docs/fault-demo-db-outage.md`](docs/fault-demo-db-outage.md) |
+| Security controls and limitations | [`SECURITY.md`](SECURITY.md) |
+| Proof, tied to a commit | [`docs/evidence.md`](docs/evidence.md) |
+
+Quick start on a laptop with Docker Desktop, `kind`, `helm` and `kubectl`:
+
+```bash
+deploy/scripts/kind-up.sh                  # cluster, ingress, metrics-server
+deploy/scripts/monitoring-up.sh            # Prometheus, Grafana, Tempo
+deploy/scripts/create-secret.sh .env.neon  # DB_URL, JWT_SECRET (32+ chars), GOOGLE_CLIENT_ID
+deploy/scripts/deploy.sh                   # build, load, helm upgrade --atomic, smoke test
+```
+Then open http://interview.localtest.me:8080 (the API; the actuator is on a separate port that is not routed).
+
 ## Structure
 
 A plain layered Spring Boot app — one `src`, no modules:
@@ -49,7 +75,8 @@ docker compose up -d db     # local Postgres on 127.0.0.1:5433, data kept in the
 ```
 Or run everything in Docker: `./deploy.sh` (app + db). Stop with `docker compose down`;
 add `-v` only if you want to wipe the database volume.
-Swagger UI: http://localhost:8000/swagger-ui/index.html
+Swagger UI: http://localhost:8000/swagger-ui/index.html when run with `./mvnw spring-boot:run`. The Docker image runs the
+`prod` profile (JSON logs, Swagger off), and the actuator (health, info, Prometheus) is on port 8081.
 
 ## Seed data
 

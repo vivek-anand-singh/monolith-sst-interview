@@ -1,0 +1,40 @@
+
+== 1. Source
+commit under test : e59f2bc4a6124002103990ab53d9f5f00ed4130e
+baseline commit   : c439e190445d5a22c342a6f3bcd54973ce98c0bc
+working tree      : clean
+commits since baseline: 17
+
+== 2. Delivery: image and Helm release
+NAME     	NAMESPACE	REVISION	UPDATED                             	STATUS  	CHART                   	APP VERSION   
+interview	interview	2       	2026-10-18 22:37:19.499959 +0530 IST	deployed	interview-monolith-0.1.0	0.0.1-SNAPSHOT
+deployed image    : interview-monolith:e59f2bc4a6124002103990ab53d9f5f00ed4130e
+image revision label: e59f2bc4a6124002103990ab53d9f5f00ed4130e
+
+== 3. Runtime: pods and the commit each one reports
+POD                                   READY   RESTARTS   VERSION-LABEL
+interview-monolith-7f859c55bb-2lw7z   true    0          e59f2bc4a6124002103990ab53d9f5f00ed4130e
+interview-monolith-7f859c55bb-kg46d   true    0          e59f2bc4a6124002103990ab53d9f5f00ed4130e
+pod/interview-monolith-7f859c55bb-2lw7z /actuator/info revision: e59f2bc4a6124002103990ab53d9f5f00ed4130e
+pod/interview-monolith-7f859c55bb-kg46d /actuator/info revision: e59f2bc4a6124002103990ab53d9f5f00ed4130e
+
+== 4. Verification: smoke test and drift check
+SMOKE TEST PASSED: revision e59f2bc4a6124002103990ab53d9f5f00ed4130e is ready and enforcing auth
+Live objects match the chart rendering
+
+== 5. User journey through the Ingress (http://interview.localtest.me:8080)
+no token                          -> 401   (expect 401)
+alice submits an experience       -> id 3fa2b7c4-e8ee-4ba8-9ec2-1597530c847e, status PENDING   (expect PENDING)
+in the public listing (pending)   -> 0   (expect 0)
+alice tries to approve her own    -> 403   (expect 403)
+admin approves                    -> 200   (expect 200)
+in the public listing (approved)  -> 1   (expect 1)
+actuator through the Ingress      -> 401   (expect 401: not routed to the management port)
+
+== 6. Observability for that journey
+experiences submitted (counter)   : 2.0
+experiences approved (counter)    : 2.0
+availability, last 15m            : 1.0
+pods scraped and up               : 2.0
+alerts firing                     : none
+traces for the approve call (Tempo): 4 found; latest trace id d9d125703e7ff26c8ea5b30bc290b503

@@ -1,0 +1,75 @@
+name: cd
+
+# Manual release of an image that ci has already built, scanned and published. The `release` environment
+# is where the approval gate lives: add required reviewers under Settings > Environments > release.
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Full commit SHA of a published image (defaults to the commit this run was started on)
+        required: false
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: cd
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+  SHA: ${{ inputs.sha || github.sha }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment: release
+    steps:
+      - uses: actions/checkout@v4
+
+      # Traceability: only an image that ci published for exactly this commit can be released.
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Pull the image built for this commit
+        run: docker pull "${IMAGE}:${SHA}"
+
+      # The target is an ephemeral kind cluster: it proves the exact published image deploys, becomes ready
+      # and reports the right revision. The long-lived demo cluster is released with deploy/scripts/deploy.sh.
+      - uses: helm/kind-action@v1
+        with:
+          cluster_name: release
+      - run: kind load docker-image "${IMAGE}:${SHA}" --name release
+
+      # Same namespace, with the same Pod Security "restricted" enforcement, as the real deployment.
+      - run: kubectl apply -f deploy/kind/namespace.yaml
+      - run: kubectl -n interview apply -f deploy/ci/postgres.yaml && kubectl -n interview rollout status deploy/smoke-postgres --timeout=120s
+      - name: Create the application secret
+        run: |
+          kubectl -n interview create secret generic interview-monolith-secrets \
+            --from-literal=DB_URL=jdbc:postgresql://smoke-postgres:5432/interview \
+            --from-literal=DB_USERNAME=smoke \
+            --from-literal=DB_PASSWORD=smoke \
+            --from-literal=JWT_SECRET="$(openssl rand -hex 32)" \
+            --from-literal=GOOGLE_CLIENT_ID=smoke-test
+
+      - name: Deploy (rolls back automatically if the pods never become ready)
+        run: >
+          helm upgrade --install interview deploy/helm/interview-monolith --namespace interview
+          --set image.repository="${IMAGE}" --set image.tag="${SHA}"
+          --set ingress.enabled=false --set autoscaling.enabled=false
+          --atomic --wait --timeout 5m
+
+      - name: Smoke test
+        run: deploy/scripts/smoke-test.sh "${SHA}"
+
+      - name: Summary
+        run: |
+          {
+            echo "### Release verified"
+            echo "- Image: \`${IMAGE}:${SHA}\`"
+            echo "- Running revision matched the commit; readiness UP; unauthenticated requests rejected"
+          } >> "$GITHUB_STEP_SUMMARY"

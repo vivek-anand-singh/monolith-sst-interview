@@ -1,0 +1,82 @@
+{{- if .Values.monitoring.enabled }}
+{{- $errorBudget := subf 1 .Values.monitoring.availabilitySlo }}
+{{- $fastBurn := printf "%.5f" (mulf 14.4 $errorBudget) }}
+{{- $slowBurn := printf "%.5f" (mulf 6 $errorBudget) }}
+{{- $slowLatency := printf "%.3f" (subf 1 .Values.monitoring.latencySlo) }}
+{{- $total := `http_server_requests_seconds_count{application="interview-backend"}` }}
+{{- $errors := `http_server_requests_seconds_count{application="interview-backend",status=~"5.."}` }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "interview-monolith.name" . }}
+  labels:
+    {{- include "interview-monolith.labels" . | nindent 4 }}
+spec:
+  groups:
+    - name: interview.sli
+      rules:
+        {{- range $window := list "5m" "30m" "1h" "6h" }}
+        - record: interview:http_error_ratio:rate{{ $window }}
+          expr: sum(rate({{ $errors }}[{{ $window }}])) / sum(rate({{ $total }}[{{ $window }}]))
+        {{- end }}
+        - record: interview:http_slow_ratio:rate10m
+          expr: 1 - (sum(rate(http_server_requests_seconds_bucket{application="interview-backend",le="0.5"}[10m])) / sum(rate({{ $total }}[10m])))
+    - name: interview.alerts
+      rules:
+        - alert: InterviewErrorBudgetFastBurn
+          expr: interview:http_error_ratio:rate5m > {{ $fastBurn }} and interview:http_error_ratio:rate1h > {{ $fastBurn }}
+          for: 2m
+          labels:
+            severity: page
+          annotations:
+            summary: Users are getting 5xx errors fast enough to exhaust the monthly error budget in about two days
+            runbook: docs/runbook.md#interviewerrorbudgetfastburn
+        - alert: InterviewErrorBudgetSlowBurn
+          expr: interview:http_error_ratio:rate30m > {{ $slowBurn }} and interview:http_error_ratio:rate6h > {{ $slowBurn }}
+          for: 15m
+          labels:
+            severity: ticket
+          annotations:
+            summary: A steady trickle of 5xx errors is consuming the error budget faster than planned
+            runbook: docs/runbook.md#interviewerrorbudgetslowburn
+        - alert: InterviewLatencySloBreach
+          expr: interview:http_slow_ratio:rate10m > {{ $slowLatency }}
+          for: 10m
+          labels:
+            severity: ticket
+          annotations:
+            summary: More than {{ $slowLatency }} of requests take longer than 500 ms
+            runbook: docs/runbook.md#interviewlatencyslobreach
+        - alert: InterviewDown
+          expr: (sum(up{job="{{ include "interview-monolith.name" . }}-metrics"}) or vector(0)) == 0
+          for: 1m
+          labels:
+            severity: page
+          annotations:
+            summary: No interview-monolith instance is being scraped, so the service is probably down
+            runbook: docs/runbook.md#interviewdown
+        - alert: InterviewReplicasUnavailable
+          expr: kube_deployment_status_replicas_unavailable{deployment="{{ include "interview-monolith.name" . }}"} > 0
+          for: 5m
+          labels:
+            severity: ticket
+          annotations:
+            summary: Some replicas have been unavailable for 5 minutes (stuck rollout or crash loop)
+            runbook: docs/runbook.md#interviewreplicasunavailable
+        - alert: InterviewDbPoolSaturated
+          expr: max(hikaricp_connections_active{application="interview-backend"}) / max(hikaricp_connections_max{application="interview-backend"}) > 0.9
+          for: 5m
+          labels:
+            severity: ticket
+          annotations:
+            summary: The database connection pool has been above 90% for 5 minutes
+            runbook: docs/runbook.md#interviewdbpoolsaturated
+        - alert: InterviewDbConnectionTimeouts
+          expr: sum(increase(hikaricp_connections_timeout_total{application="interview-backend"}[5m])) > 0
+          for: 1m
+          labels:
+            severity: page
+          annotations:
+            summary: Requests are timing out waiting for a database connection (database unreachable or exhausted)
+            runbook: docs/runbook.md#interviewdbconnectiontimeouts
+{{- end }}
